@@ -20,14 +20,18 @@ limitations under the License.
 import argparse
 import os
 import runpy
+import sys
 
-try:
-    import simplejson as json
-except ImportError:
-    import json
+import mailparser
+from .exceptions import MailParserOutlookError
+from .utils import (
+    custom_log,
+    print_attachments,
+    print_mail_fingerprints,
+    safe_print,
+    write_attachments,
+)
 
-from mailparser import MailParser
-from .utils import fingerprints
 
 current = os.path.realpath(os.path.dirname(__file__))
 
@@ -52,6 +56,20 @@ def get_args():
         "--string",
         dest="string",
         help="Raw email string")
+    parsing_group.add_argument(
+        "-k",
+        "--stdin",
+        dest="stdin",
+        action="store_true",
+        help="Enable parsing from stdin")
+
+    parser.add_argument(
+        "-l",
+        "--log-level",
+        dest="log_level",
+        default="WARNING",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"],
+        help="Set log level")
 
     parser.add_argument(
         "-j",
@@ -89,6 +107,13 @@ def get_args():
         help="Print the to of mail")
 
     parser.add_argument(
+        "-dt",
+        "--delivered-to",
+        dest="delivered_to",
+        action="store_true",
+        help="Print the delivered-to of mail")
+
+    parser.add_argument(
         "-m",
         "--from",
         dest="from_",
@@ -103,6 +128,13 @@ def get_args():
         help="Print the subject of mail")
 
     parser.add_argument(
+        "-c",
+        "--receiveds",
+        dest="receiveds",
+        action="store_true",
+        help="Print all receiveds of mail")
+
+    parser.add_argument(
         "-d",
         "--defects",
         dest="defects",
@@ -110,11 +142,11 @@ def get_args():
         help="Print the defects of mail")
 
     parser.add_argument(
-        "-n",
-        "--anomalies",
-        dest="anomalies",
+        "-o",
+        "--outlook",
+        dest="outlook",
         action="store_true",
-        help="Print the anomalies of mail")
+        help="Analyze Outlook msg")
 
     parser.add_argument(
         "-i",
@@ -138,6 +170,20 @@ def get_args():
         help="Print attachments with fingerprints")
 
     parser.add_argument(
+        "-sa",
+        "--store-attachments",
+        dest="store_attachments",
+        action="store_true",
+        help="Store attachments on disk")
+
+    parser.add_argument(
+        "-ap",
+        "--attachments-path",
+        dest="attachments_path",
+        default="/tmp",
+        help="Path where store attachments")
+
+    parser.add_argument(
         '-v',
         '--version',
         action='version',
@@ -146,75 +192,55 @@ def get_args():
     return parser
 
 
-def safe_print(data):
-    try:
-        print(data)
-    except UnicodeEncodeError:
-        print(data.encode('utf-8'))
-
-
-def print_mail_fingerprints(data):
-    md5, sha1, sha256, sha512 = fingerprints(data)
-    print("md5:\t{}".format(md5))
-    print("sha1:\t{}".format(sha1))
-    print("sha256:\t{}".format(sha256))
-    print("sha512:\t{}".format(sha512))
-
-
-def print_attachments(attachments, flag_hash):
-    if flag_hash:
-        for i in attachments:
-            if i.get("content_transfer_encoding") == "base64":
-                payload = i["payload"].decode("base64")
-            else:
-                payload = i["payload"]
-
-            i["md5"], i["sha1"], i["sha256"], i["sha512"] = \
-                fingerprints(payload)
-
-    for i in attachments:
-        safe_print(json.dumps(i, ensure_ascii=False, indent=4))
-
-
 def main():
     args = get_args().parse_args()
-
-    parser = MailParser()
+    log = custom_log(level=args.log_level)
 
     if args.file:
-        parser.parse_from_file(args.file)
+        if args.outlook:
+            log.debug("Analysis Outlook mail")
+            parser = mailparser.parse_from_file_msg(args.file)
+        else:
+            parser = mailparser.parse_from_file(args.file)
     elif args.string:
-        parser.parse_from_string(args.string)
+        parser = mailparser.parse_from_string(args.string)
+    elif args.stdin:
+        if args.outlook:
+            raise MailParserOutlookError(
+                "You can't use stdin with msg Outlook")
+        parser = mailparser.parse_from_file_obj(sys.stdin)
 
     if args.json:
-        j = json.loads(parser.parsed_mail_json)
-        safe_print(json.dumps(j, ensure_ascii=False, indent=4))
+        safe_print(parser.mail_json)
 
     if args.body:
-        # safe_print(parser.body)
         safe_print(parser.body)
 
     if args.headers:
-        safe_print(parser.headers)
+        safe_print(parser.headers_json)
 
     if args.to:
-        safe_print(parser.to_)
+        safe_print(parser.to_json)
+
+    if args.delivered_to:
+        safe_print(parser.delivered_to_json)
 
     if args.from_:
-        safe_print(parser.from_)
+        safe_print(parser.from_json)
 
     if args.subject:
         safe_print(parser.subject)
 
-    if args.defects:
-        for i in parser.defects_category:
-            safe_print(i)
+    if args.receiveds:
+        safe_print(parser.received_json)
 
-    if args.anomalies:
-        for i in parser.anomalies:
+    if args.defects:
+        log.debug("Printing defects")
+        for i in parser.defects_categories:
             safe_print(i)
 
     if args.senderip:
+        log.debug("Printing sender IP")
         r = parser.get_server_ipaddress(args.senderip)
         if r:
             safe_print(r)
@@ -222,10 +248,16 @@ def main():
             safe_print("Not Found")
 
     if args.attachments or args.attachments_hash:
-        print_attachments(parser.attachments_list, args.attachments_hash)
+        log.debug("Printing attachments details")
+        print_attachments(parser.attachments, args.attachments_hash)
 
     if args.mail_hash:
+        log.debug("Printing also mail fingerprints")
         print_mail_fingerprints(parser.body.encode("utf-8"))
+
+    if args.store_attachments:
+        log.debug("Store attachments on disk")
+        write_attachments(parser.attachments, args.attachments_path)
 
 
 if __name__ == '__main__':

@@ -17,4 +17,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from .mailparser import MailParser
+
+from .mailparser import (
+    MailParser,
+    parse_from_bytes,
+    parse_from_file,
+    parse_from_file_msg,
+    parse_from_file_obj,
+    parse_from_string)
+
+from .utils import get_header

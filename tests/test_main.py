@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+import logging
 import os
 import sys
 import unittest
@@ -25,6 +26,7 @@ base_path = os.path.realpath(os.path.dirname(__file__))
 root = os.path.join(base_path, '..')
 sys.path.append(root)
 
+logging.getLogger().addHandler(logging.NullHandler())
 
 from mailparser.__main__ import get_args
 
@@ -37,6 +39,9 @@ class TestMain(unittest.TestCase):
     def test_required(self):
         with self.assertRaises(SystemExit):
             self.parser.parse_args(["--file", "test", "--string", "test"])
+
+        with self.assertRaises(SystemExit):
+            self.parser.parse_args(["--file", "test", "--stdin"])
 
         with self.assertRaises(SystemExit):
             self.parser.parse_args(["--file"])
@@ -75,9 +80,6 @@ class TestMain(unittest.TestCase):
         parsed = self.parser.parse_args(["--file", "mail.eml", "-d"])
         self.assertTrue(parsed.defects)
 
-        parsed = self.parser.parse_args(["--file", "mail.eml", "--anomalies"])
-        self.assertTrue(parsed.anomalies)
-
         parsed = self.parser.parse_args([
             "--file", "mail.eml", "--senderip", "trust"])
         self.assertTrue(parsed.senderip)
@@ -88,6 +90,9 @@ class TestMain(unittest.TestCase):
         parsed = self.parser.parse_args([
             "--file", "mail.eml", "--attachments-hash"])
         self.assertTrue(parsed.attachments_hash)
+
+        parsed = self.parser.parse_args(["--file", "mail.eml", "-c"])
+        self.assertTrue(parsed.receiveds)
 
 
 if __name__ == '__main__':

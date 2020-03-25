@@ -18,14 +18,15 @@ limitations under the License.
 """
 
 import os
+import io
 import runpy
 from setuptools import setup
 
 
 current = os.path.realpath(os.path.dirname(__file__))
 
-with open(os.path.join(current, 'README')) as f:
-    long_description = f.read().strip()
+with io.open(os.path.join(current, 'README.md'), encoding="utf-8") as f:
+    long_description = f.read()
 
 with open(os.path.join(current, 'requirements.txt')) as f:
     requires = f.read().splitlines()
@@ -40,6 +41,7 @@ setup(
     license="Apache License, Version 2.0",
     url="https://github.com/SpamScope/mail-parser",
     long_description=long_description,
+    long_description_content_type="text/markdown",
     version=__version__,
     author="Fedele Mantuano",
     author_email="mantuano.fedele@gmail.com",
@@ -60,6 +62,8 @@ setup(
         "Programming Language :: Python :: 3.3",
         "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
     ],
     install_requires=requires,
     entry_points={'console_scripts': [

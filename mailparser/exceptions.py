@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright 2016 Fedele Mantuano (https://twitter.com/fedelemantuano)
+Copyright 2018 Fedele Mantuano (https://www.linkedin.com/in/fmantuano/)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,45 @@ limitations under the License.
 """
 
 
-__all__ = ["InvalidMail"]
+__all__ = (
+    "MailParserError",
+    "MailParserOutlookError",
+    "MailParserEnvironmentError",
+    "MailParserOSError",
+    "MailParserReceivedParsingError"
+)
 
 
-class InvalidMail(ValueError):
+class MailParserError(Exception):
+    """
+    Base MailParser Exception
+    """
+    pass
+
+
+class MailParserOutlookError(MailParserError):
+    """
+    Raised when there is an error with Outlook integration
+    """
+    pass
+
+
+class MailParserEnvironmentError(MailParserError):
+    """
+    Raised when the environment is not correct
+    """
+    pass
+
+
+class MailParserOSError(MailParserError):
+    """
+    Raised when there is an OS error
+    """
+    pass
+
+
+class MailParserReceivedParsingError(MailParserError):
+    """
+    Raised when a received header cannot be parsed
+    """
     pass
